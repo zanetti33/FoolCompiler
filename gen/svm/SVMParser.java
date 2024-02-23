@@ -1,4 +1,4 @@
-// Generated from C:/Users/lzanetti/IdeaProjects/Fool/src/main/java/svm/SVM.g4 by ANTLR 4.13.1
+// Generated from C:/Users/lorenzo.zanetti5/IdeaProjects/FoolCompiler/src/main/java/svm\SVM.g4 by ANTLR 4.10.1
 package svm;
 
 import java.util.*;
@@ -12,9 +12,9 @@ import java.util.List;
 import java.util.Iterator;
 import java.util.ArrayList;
 
-@SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue"})
+@SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast"})
 public class SVMParser extends Parser {
-	static { RuntimeMetaData.checkVersion("4.13.1", RuntimeMetaData.VERSION); }
+	static { RuntimeMetaData.checkVersion("4.10.1", RuntimeMetaData.VERSION); }
 
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
@@ -107,7 +107,6 @@ public class SVMParser extends Parser {
 		_interp = new ParserATNSimulator(this,_ATN,_decisionToDFA,_sharedContextCache);
 	}
 
-	@SuppressWarnings("CheckReturnValue")
 	public static class AssemblyContext extends ParserRuleContext {
 		public TerminalNode EOF() { return getToken(SVMParser.EOF, 0); }
 		public List<InstructionContext> instruction() {
@@ -145,7 +144,7 @@ public class SVMParser extends Parser {
 			setState(7);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 50331646L) != 0)) {
+			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << PUSH) | (1L << POP) | (1L << ADD) | (1L << SUB) | (1L << MULT) | (1L << DIV) | (1L << STOREW) | (1L << LOADW) | (1L << BRANCH) | (1L << BRANCHEQ) | (1L << BRANCHLESSEQ) | (1L << JS) | (1L << LOADRA) | (1L << STORERA) | (1L << LOADTM) | (1L << STORETM) | (1L << LOADFP) | (1L << STOREFP) | (1L << COPYFP) | (1L << LOADHP) | (1L << STOREHP) | (1L << PRINT) | (1L << HALT) | (1L << LABEL))) != 0)) {
 				{
 				{
 				setState(4);
@@ -174,7 +173,6 @@ public class SVMParser extends Parser {
 		return _localctx;
 	}
 
-	@SuppressWarnings("CheckReturnValue")
 	public static class InstructionContext extends ParserRuleContext {
 		public Token n;
 		public Token l;

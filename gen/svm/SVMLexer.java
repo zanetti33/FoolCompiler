@@ -1,4 +1,4 @@
-// Generated from C:/Users/lzanetti/IdeaProjects/Fool/src/main/java/svm/SVM.g4 by ANTLR 4.13.1
+// Generated from C:/Users/lorenzo.zanetti5/IdeaProjects/FoolCompiler/src/main/java/svm\SVM.g4 by ANTLR 4.10.1
 package svm;
 import org.antlr.v4.runtime.Lexer;
 import org.antlr.v4.runtime.CharStream;
@@ -9,9 +9,9 @@ import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
 import org.antlr.v4.runtime.misc.*;
 
-@SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue", "this-escape"})
+@SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast"})
 public class SVMLexer extends Lexer {
-	static { RuntimeMetaData.checkVersion("4.13.1", RuntimeMetaData.VERSION); }
+	static { RuntimeMetaData.checkVersion("4.10.1", RuntimeMetaData.VERSION); }
 
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
