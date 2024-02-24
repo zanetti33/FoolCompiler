@@ -31,7 +31,7 @@ public class Test {
     	SymbolTableASTVisitor symtableVisitor = new SymbolTableASTVisitor();
     	symtableVisitor.visit(ast);
     	System.out.println("You had "+symtableVisitor.stErrors+" symbol table errors.\n");
-/*
+
     	System.out.println("Visualizing Enriched AST.");
     	new PrintEASTVisitor().visit(ast);
     	System.out.println("");
@@ -48,7 +48,7 @@ public class Test {
     		System.out.println("Type checking error in main program expression: "+e.text); 
     	}       	
     	System.out.println("You had "+FOOLlib.typeErrors+" type checking errors.\n");
-*/
+
     	int frontEndErrors = lexer.lexicalErrors+parser.getNumberOfSyntaxErrors()+symtableVisitor.stErrors+FOOLlib.typeErrors;
 		System.out.println("You had a total of "+frontEndErrors+" front-end errors.\n");
 		
