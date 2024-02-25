@@ -199,4 +199,83 @@ public class PrintEASTVisitor extends BaseEASTVisitor<Void,VoidException> {
 		return null;
 	}
 
+	@Override
+	public Void visitNode(ClassNode n) throws VoidException {
+		printNode(
+				n,
+				n.superId != null ?
+					n.id + " extends " + n.superId :
+					n.id
+		);
+		for (Node field : n.fields) visit(field);
+		for (Node method : n.methods) visit(method);
+		return null;
+	}
+
+	@Override
+	public Void visitNode(FieldNode n) throws VoidException {
+		printNode(n,n.id);
+		visit(n.getType());
+		return null;
+	}
+
+	@Override
+	public Void visitNode(MethodNode n) throws VoidException {
+		printNode(n, n.id);
+		visit(n.retType);
+		for (Node par: n.parlist) visit(par);
+		for (Node par: n.declist) visit(par);
+		visit(n.exp);
+		return null;
+	}
+
+	@Override
+	public Void visitNode(ClassCallNode n) throws VoidException {
+		printNode(n, n.classId + "." + n.methodId + " at nesting level: " + n.nestingLevel);
+		visit(n.entry);
+		visit(n.methodEntry);
+		for (Node arg : n.args) visit(arg);
+		return null;
+	}
+
+	@Override
+	public Void visitNode(NewNode n) throws VoidException {
+		printNode(n, n.classId);
+		visit(n.entry);
+		for (Node arg : n.args) visit(arg);
+		return null;
+	}
+
+	@Override
+	public Void visitNode(EmptyNode n) throws VoidException {
+		printNode(n);
+		return null;
+	}
+
+	@Override
+	public Void visitNode(ClassTypeNode n) throws VoidException {
+		printNode(n);
+		for (Node fieldType : n.fieldTypes) visit(fieldType);
+		for (Node methodType : n.methodTypes) visit(methodType);
+		return null;
+	}
+
+	@Override
+	public Void visitNode(MethodTypeNode n) throws VoidException {
+		printNode(n);
+		visit(n.fun);
+		return null;
+	}
+
+	@Override
+	public Void visitNode(RefTypeNode n) throws VoidException {
+		printNode(n, n.classId);
+		return null;
+	}
+
+	@Override
+	public Void visitNode(EmptyTypeNode n) throws VoidException {
+		printNode(n);
+		return null;
+	}
 }

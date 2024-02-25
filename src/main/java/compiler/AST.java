@@ -266,6 +266,7 @@ public class AST {
 		final TypeNode retType;
 		final List<ParNode> parlist;
 		final List<DecNode> declist;
+		int offset;
 		final Node exp;
 		MethodNode(String i, TypeNode rt, List<ParNode> pl, List<DecNode> dl, Node e) {
 			id=i;
@@ -276,7 +277,6 @@ public class AST {
 		}
 
 		//void setType(TypeNode t) {type = t;}
-
 		@Override
 		public <S,E extends Exception> S accept(BaseASTVisitor<S,E> visitor) throws E {return visitor.visitNode(this);}
 	}
@@ -285,6 +285,9 @@ public class AST {
 		final String classId;
 		final String methodId;
 		final List<Node> args;
+		STentry entry;
+		int nestingLevel;
+		STentry methodEntry;
 		public ClassCallNode(String classId, String methodId, List<Node> args) {
 			this.classId = classId;
 			this.methodId = methodId;
@@ -299,6 +302,7 @@ public class AST {
 	public static class NewNode extends Node {
 		final String classId;
 		final List<Node> args;
+		STentry entry;
 		public NewNode(String classId, List<Node> args) {
 			this.classId = classId;
 			this.args = args;
@@ -316,7 +320,7 @@ public class AST {
 		}
 	}
 
-	public static class ClassTypeNode extends Node {
+	public static class ClassTypeNode extends TypeNode {
 		final List<TypeNode> fieldTypes;
 		final List<TypeNode> methodTypes;
 		public ClassTypeNode(List<TypeNode> fieldTypes, List<TypeNode> methodTypes) {
@@ -329,7 +333,7 @@ public class AST {
 		}
 	}
 
-	public static class MethodTypeNode extends Node {
+	public static class MethodTypeNode extends TypeNode {
 		final ArrowTypeNode fun;
 		public MethodTypeNode(ArrowTypeNode fun) {
 			this.fun = fun;
