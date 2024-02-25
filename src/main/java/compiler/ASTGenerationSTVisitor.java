@@ -1,6 +1,7 @@
 package compiler;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTree;
@@ -8,6 +9,8 @@ import org.antlr.v4.runtime.tree.ParseTree;
 import compiler.AST.*;
 import compiler.FOOLParser.*;
 import compiler.lib.*;
+import org.antlr.v4.runtime.tree.TerminalNode;
+
 import static compiler.lib.FOOLlib.*;
 
 public class ASTGenerationSTVisitor extends FOOLBaseVisitor<Node> {
@@ -231,6 +234,92 @@ public class ASTGenerationSTVisitor extends FOOLBaseVisitor<Node> {
 		for (ExpContext arg : c.exp()) arglist.add(visit(arg));
 		Node n = new CallNode(c.ID().getText(), arglist);
 		n.setLine(c.ID().getSymbol().getLine());
+		return n;
+	}
+
+	@Override
+	public Node visitCldec(CldecContext ctx) {
+		if (print) printVarAndProdName(ctx);
+		// tolgo il primo che riguarda la classe
+		List<TerminalNode> ids = ctx.ID();
+		TerminalNode classId = ids.remove(0);
+		// controllo se estende un'altra classe
+		String superId = ctx.EXTENDS() == null ? null : ids.remove(0).getText();
+		// e scorro sugli altri che sono invece i campi
+		List<FieldNode> fields = new ArrayList<>();
+		AtomicInteger iType = new AtomicInteger();
+		ids.forEach(fieldCtx -> {
+			TypeNode type = (TypeNode) visit(ctx.type(iType.getAndIncrement()));
+			FieldNode node = new FieldNode(fieldCtx.getText(), type);
+			node.setLine(fieldCtx.getSymbol().getLine());
+			fields.add(node);
+		});
+		// prendo i metodi
+		List<MethodNode> methods = new ArrayList<>();
+		ctx.methdec().forEach(methCtx -> methods.add((MethodNode) visit(methCtx)));
+		// creo il nodo della classe
+		Node n = new ClassNode(
+				classId.getText(),
+				superId,
+				fields,
+				methods
+		);
+		n.setLine(classId.getSymbol().getLine());
+		return n;
+	}
+
+	@Override
+	public Node visitMethdec(MethdecContext ctx) {
+		if (print) printVarAndProdName(ctx);
+		List<ParNode> parList = new ArrayList<>();
+		for (int i = 1; i < ctx.ID().size(); i++) {
+			ParNode p = new ParNode(ctx.ID(i).getText(),(TypeNode) visit(ctx.type(i)));
+			p.setLine(ctx.ID(i).getSymbol().getLine());
+			parList.add(p);
+		}
+		List<DecNode> decList = new ArrayList<>();
+		for (DecContext dec : ctx.dec()) decList.add((DecNode) visit(dec));
+		Node n = null;
+		if (!ctx.ID().isEmpty()) { //non-incomplete ST
+			n = new MethodNode(ctx.ID(0).getText(),(TypeNode)visit(ctx.type(0)),parList,decList,visit(ctx.exp()));
+			n.setLine(ctx.FUN().getSymbol().getLine());
+		}
+		return n;
+	}
+
+	@Override
+	public Node visitNew(NewContext ctx) {
+		if (print) printVarAndProdName(ctx);
+		if (ctx.ID() == null) return null;
+		List<Node> args = new ArrayList<>();
+		ctx.exp().forEach(argCtx -> args.add(visit(argCtx)));
+		Node n = new NewNode(ctx.ID().getText(), args);
+		n.setLine(ctx.ID().getSymbol().getLine());
+		return n;
+	}
+
+	@Override
+	public Node visitNull(NullContext ctx) {
+		if (print) printVarAndProdName(ctx);
+		return new EmptyNode();
+	}
+
+	@Override
+	public Node visitDotCall(DotCallContext ctx) {
+		if (print) printVarAndProdName(ctx);
+		if (ctx.ID().size() != 2) return null;
+		List<Node> arglist = new ArrayList<>();
+		for (ExpContext arg : ctx.exp()) arglist.add(visit(arg));
+		Node n = new ClassCallNode(ctx.ID(0).getText(), ctx.ID(1).getText(), arglist);
+		n.setLine(ctx.ID(0).getSymbol().getLine());
+		return n;
+	}
+
+	@Override
+	public Node visitIdType(IdTypeContext ctx) {
+		if (print) printVarAndProdName(ctx);
+		Node n = new RefTypeNode(ctx.ID().getText());
+		n.setLine(ctx.ID().getSymbol().getLine());
 		return n;
 	}
 }
