@@ -237,15 +237,20 @@ public class SymbolTableASTVisitor extends BaseASTVisitor<Void,VoidException> {
 			if (globalScope.get(n.superId) != null &&
 				classTable.containsKey(n.superId)) {
 				classType = new ClassTypeNode(
-						((ClassTypeNode) globalScope.get(n.superId).type).fieldTypes,
-						((ClassTypeNode) globalScope.get(n.superId).type).methodTypes
+						new ArrayList<>(((ClassTypeNode) globalScope.get(n.superId).type).fieldTypes),
+						new ArrayList<>(((ClassTypeNode) globalScope.get(n.superId).type).methodTypes)
 				);
+				n.type = classType;
+				n.superEntry = globalScope.get(n.superId);
 			} else {
 				System.out.println("Class " + n.superId + " at line " + n.getLine() + " not declared");
 				stErrors++;
 			}
 		}
-		globalScope.put(n.id, new STentry(0, classType, decOffset--));
+		if (globalScope.put(n.id, new STentry(0, classType, decOffset--)) != null) {
+			System.out.println("Class " + n.id + " already declared");
+			stErrors++;
+		}
 		//nella Class Table viene aggiunto il nome della classe
 		//mappato ad una nuova Virtual Table
 		Map<String, STentry> virtualTable = new HashMap<>();
@@ -274,6 +279,7 @@ public class SymbolTableASTVisitor extends BaseASTVisitor<Void,VoidException> {
 					fieldOffset = virtualTable.get(field.id).offset;
 					virtualTable.put(field.id, new STentry(nestingLevel, field.getType(), fieldOffset));
 					classType.fieldTypes.set(-fieldOffset-1, field.getType());
+                    field.offset = fieldOffset;
 				}
 			} else {
 				// creo un nuovo riferimento al campo
@@ -284,12 +290,16 @@ public class SymbolTableASTVisitor extends BaseASTVisitor<Void,VoidException> {
 				} else {
 					classType.fieldTypes.add(-fieldOffset-1, field.getType());
 				}
+                field.offset = fieldOffset;
 			}
 		}
 		//visito tutti i metodi all'interno della classe
 		for (MethodNode method : n.methods) {
 			visit(method);
-			classType.methodTypes.add(method.offset, method.getType());
+			classType.methodTypes.add(method.offset, new MethodTypeNode(new ArrowTypeNode(
+					method.parlist.stream().map(DecNode::getType).toList(),
+					method.retType
+			)));
 		}
 		//rimuovere la hashmap corrente poiche' esco dallo scope
 		symTable.remove(nestingLevel--);

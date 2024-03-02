@@ -178,10 +178,14 @@ public class TypeCheckEASTVisitor extends BaseEASTVisitor<TypeNode,TypeException
 	@Override
 	public TypeNode visitNode(CallNode n) throws TypeException {
 		if (print) printNode(n,n.id);
-		TypeNode t = visit(n.entry); 
-		if ( !(t instanceof ArrowTypeNode) )
+		TypeNode t = visit(n.entry);
+		ArrowTypeNode at;
+		if (t instanceof ArrowTypeNode)
+			at = (ArrowTypeNode) t;
+		else if (t instanceof MethodTypeNode)
+			at = ((MethodTypeNode) t).fun;
+		else
 			throw new TypeException("Invocation of a non-function "+n.id,n.getLine());
-		ArrowTypeNode at = (ArrowTypeNode) t;
 		if ( !(at.parlist.size() == n.arglist.size()) )
 			throw new TypeException("Wrong number of parameters in the invocation of "+n.id,n.getLine());
 		for (int i = 0; i < n.arglist.size(); i++)
@@ -193,9 +197,11 @@ public class TypeCheckEASTVisitor extends BaseEASTVisitor<TypeNode,TypeException
 	@Override
 	public TypeNode visitNode(IdNode n) throws TypeException {
 		if (print) printNode(n,n.id);
-		TypeNode t = visit(n.entry); 
-		if (t instanceof ArrowTypeNode)
+		TypeNode t = visit(n.entry);
+		if (t instanceof ArrowTypeNode || t instanceof MethodTypeNode)
 			throw new TypeException("Wrong usage of function identifier " + n.id,n.getLine());
+		if (t instanceof ClassTypeNode)
+			throw new TypeException("Wrong usage of class identifier " + n.id,n.getLine());
 		return t;
 	}
 
@@ -241,4 +247,119 @@ public class TypeCheckEASTVisitor extends BaseEASTVisitor<TypeNode,TypeException
 		return ckvisit(entry.type); 
 	}
 
+	// estensione oggetti
+	@Override
+	public TypeNode visitNode(ClassNode n) throws TypeException {
+		if (print) printNode(n);
+		// aggiunta ai mapping dei super type
+		if (n.superId != null)
+			superType.put(n.id, n.superId);
+		for (Node method : n.methods)
+			try {
+				visit(method);
+			} catch (IncomplException e) {
+			} catch (TypeException e) {
+				System.out.println("Type checking error in a declaration: " + e.text);
+			}
+
+		if (n.superId != null) {
+			ClassTypeNode superType = (ClassTypeNode) n.superEntry.type;
+			ClassTypeNode thisType = (ClassTypeNode) n.type;
+			// controllo che field siano sottotipi della super classe
+			for(int i = 0; i < superType.fieldTypes.size(); i++) {
+				if (!isSubtype(
+						thisType.fieldTypes.get(i),
+						superType.fieldTypes.get(i)
+				))
+					throw new TypeException("field " + i + "of class " + n.id + " is not subtype of same field in superClass" + n.superId, n.getLine());
+			}
+			// controllo che methods siano sottotipi della super classe
+			for(int i = 0; i < superType.methodTypes.size(); i++) {
+				if (!isSubtype(
+						thisType.methodTypes.get(i),
+						superType.methodTypes.get(i)
+				))
+					throw new TypeException("Method " + i + "of class " + n.id + " is not subtype of same method in superClass" + n.superId, n.getLine());
+			}
+		}
+		return null;
+	}
+
+	@Override
+	public TypeNode visitNode(MethodNode n) throws TypeException {
+		if (print) printNode(n,n.id);
+		for (Node dec : n.declist)
+			try {
+				visit(dec);
+			} catch (IncomplException e) {
+			} catch (TypeException e) {
+				System.out.println("Type checking error in a declaration: " + e.text);
+			}
+		if ( !isSubtype(visit(n.exp),ckvisit(n.retType)) )
+			throw new TypeException("Wrong return type for function " + n.id,n.getLine());
+		return null;
+	}
+
+	@Override
+	public TypeNode visitNode(ClassCallNode n) throws TypeException {
+		if (print) printNode(n, n.classId + "." + n.methodId + " at nesting level: " + n.nestingLevel);
+		visit(n.entry);
+		TypeNode t = visit(n.methodEntry);
+		ArrowTypeNode at;
+		if (t instanceof MethodTypeNode)
+			at = ((MethodTypeNode) t).fun;
+		else
+			throw new TypeException("Invocation of a non-function "+n.classId,n.getLine());
+		if ( !(at.parlist.size() == n.args.size()) )
+			throw new TypeException("Wrong number of parameters in the invocation of "+n.classId,n.getLine());
+		for (int i = 0; i < n.args.size(); i++)
+			if ( !(isSubtype(visit(n.args.get(i)),at.parlist.get(i))) )
+				throw new TypeException("Wrong type for "+(i+1)+"-th parameter in the invocation of "+n.classId,n.getLine());
+		return at.ret;
+	}
+
+	@Override
+	public TypeNode visitNode(NewNode n) throws TypeException {
+		if (print) printNode(n, n.classId);
+		TypeNode t = visit(n.entry);
+		if ( !(t instanceof ClassTypeNode) )
+			throw new TypeException("Invocation of a non-class "+n.classId,n.getLine());
+		ClassTypeNode at = (ClassTypeNode) t;
+		if ( !(at.fieldTypes.size() == n.args.size()) )
+			throw new TypeException("Wrong number of parameters in the invocation of "+n.classId,n.getLine());
+		for (int i = 0; i < n.args.size(); i++)
+			if ( !(isSubtype(visit(n.args.get(i)),at.fieldTypes.get(i))) )
+				throw new TypeException("Wrong type for "+(i+1)+"-th parameter in the invocation of "+n.classId,n.getLine());
+		return new RefTypeNode(n.classId);
+	}
+
+	@Override
+	public TypeNode visitNode(EmptyNode n) throws TypeException {
+		if (print) printNode(n,"null");
+		return new EmptyTypeNode();
+	}
+
+	@Override
+	public TypeNode visitNode(ClassTypeNode n) throws TypeException {
+		if (print) printNode(n);
+		return null;
+	}
+
+	@Override
+	public TypeNode visitNode(MethodTypeNode n) throws TypeException {
+		if (print) printNode(n);
+		return null;
+	}
+
+	@Override
+	public TypeNode visitNode(RefTypeNode n) throws TypeException {
+		if (print) printNode(n);
+		return null;
+	}
+
+	@Override
+	public TypeNode visitNode(EmptyTypeNode n) throws TypeException {
+		if (print) printNode(n);
+		return null;
+	}
 }
