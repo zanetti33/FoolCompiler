@@ -3,12 +3,20 @@ package compiler;
 import compiler.AST.*;
 import compiler.lib.*;
 import compiler.exc.*;
+import svm.ExecuteVM;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
+
 import static compiler.lib.FOOLlib.*;
 
 public class CodeGenerationASTVisitor extends BaseASTVisitor<String, VoidException> {
 
-  CodeGenerationASTVisitor() {}
-  CodeGenerationASTVisitor(boolean debug) {super(false,debug);} //enables print for debugging
+	private final List<List<String>> dispatchTables = new ArrayList<>();
+	CodeGenerationASTVisitor() {}
+	CodeGenerationASTVisitor(boolean debug) {super(false,debug);} //enables print for debugging
 
 	@Override
 	public String visitNode(ProgLetInNode n) {
@@ -82,7 +90,7 @@ public class CodeGenerationASTVisitor extends BaseASTVisitor<String, VoidExcepti
 	@Override
 	public String visitNode(IfNode n) {
 		if (print) printNode(n);
-	 	String l1 = freshLabel();
+		String l1 = freshLabel();
 	 	String l2 = freshLabel();		
 		return nlJoin(
 			visit(n.cond),
@@ -116,7 +124,7 @@ public class CodeGenerationASTVisitor extends BaseASTVisitor<String, VoidExcepti
 	@Override
 	public String visitNode(EqualNode n) {
 		if (print) printNode(n);
-	 	String l1 = freshLabel();
+		String l1 = freshLabel();
 	 	String l2 = freshLabel();
 		return nlJoin(
 			visit(n.left),
@@ -251,18 +259,34 @@ public class CodeGenerationASTVisitor extends BaseASTVisitor<String, VoidExcepti
 		String argCode = null, getAR = null;
 		for (int i=n.arglist.size()-1;i>=0;i--) argCode=nlJoin(argCode,visit(n.arglist.get(i)));
 		for (int i = 0;i<n.nl-n.entry.nl;i++) getAR=nlJoin(getAR,"lw");
-		return nlJoin(
-			"lfp", // load Control Link (pointer to frame of function "id" caller)
-			argCode, // generate code for argument expressions in reversed order
-			"lfp", getAR, // retrieve address of frame containing "id" declaration
-                          // by following the static chain (of Access Links)
-            "stm", // set $tm to popped value (with the aim of duplicating top of stack)
-            "ltm", // load Access Link (pointer to frame of function "id" declaration)
-            "ltm", // duplicate top of stack
-            "push "+n.entry.offset, "add", // compute address of "id" declaration
-			"lw", // load address of "id" function
-            "js"  // jump to popped address (saving address of subsequent instruction in $ra)
-		);
+		if (n.entry.type instanceof MethodTypeNode) {
+			return nlJoin(
+					"lfp", // load Control Link (pointer to frame of function "id" caller)
+					argCode, // generate code for argument expressions in reversed order
+					"lfp", getAR, // retrieve address of frame containing "id" declaration
+					// by following the static chain (of Access Links)
+					"stm", // set $tm to popped value (with the aim of duplicating top of stack)
+					"ltm", // load Access Link (pointer to frame of function "id" declaration)
+					"ltm", // duplicate top of stack
+					"lw", // salvo l'indirizzo del metodo
+					"push "+n.entry.offset, "add", // compute address of "id" declaration
+					"lw", // load address of "id" function
+					"js"  // jump to popped address (saving address of subsequent instruction in $ra)
+			);
+		} else {
+			return nlJoin(
+					"lfp", // load Control Link (pointer to frame of function "id" caller)
+					argCode, // generate code for argument expressions in reversed order
+					"lfp", getAR, // retrieve address of frame containing "id" declaration
+					// by following the static chain (of Access Links)
+					"stm", // set $tm to popped value (with the aim of duplicating top of stack)
+					"ltm", // load Access Link (pointer to frame of function "id" declaration)
+					"ltm", // duplicate top of stack
+					"push "+n.entry.offset, "add", // compute address of "id" declaration
+					"lw", // load address of "id" function
+					"js"  // jump to popped address (saving address of subsequent instruction in $ra)
+			);
+		}
 	}
 
 	@Override
@@ -288,5 +312,149 @@ public class CodeGenerationASTVisitor extends BaseASTVisitor<String, VoidExcepti
 	public String visitNode(IntNode n) {
 		if (print) printNode(n,n.val.toString());
 		return "push "+n.val;
+	}
+
+	@Override
+	public String visitNode(ClassNode n) {
+		if (print) printNode(n,n.id);
+		// aggiundo alla dispatch table la classe con relativi metodi
+		List<String> dispatchTable;
+		if (n.superId != null) {
+			dispatchTable = new ArrayList<>(dispatchTables.get(-n.superEntry.offset-2));
+		} else {
+			dispatchTable = new ArrayList<>();
+		}
+		n.methods.forEach(
+				methodNode -> {
+					visit(methodNode);
+					if (n.superId != null)
+						dispatchTable.set(methodNode.offset, methodNode.label);
+					else
+						dispatchTable.add(methodNode.label);
+				}
+		);
+		dispatchTables.add(dispatchTable);
+		AtomicReference<String> instructionList = new AtomicReference<>("");
+		// salvo l'id sull'heap e incremento il pointer, per ogni
+		dispatchTable.forEach(
+				method -> instructionList.set(nlJoin(
+								instructionList.get(),
+								"push " + method,
+								"lhp",
+								"sw",
+								"lhp",
+								"push 1",
+								"add",
+								"shp"
+				)));
+		return nlJoin(
+				"lhp",
+				instructionList.get()
+		);
+	}
+
+	@Override
+	public String visitNode(MethodNode n) {
+		if (print) printNode(n,n.id);
+		String declCode = null, popDecl = null, popParl = null;
+		for (Node dec : n.declist) {
+			declCode = nlJoin(declCode,visit(dec));
+			popDecl = nlJoin(popDecl,"pop");
+		}
+		for (int i=0;i<n.parlist.size();i++) popParl = nlJoin(popParl,"pop");
+		String methodLabel = freshLabel();
+		n.label = methodLabel;
+		putCode(
+				nlJoin(
+						methodLabel+":",
+						"cfp", // set $fp to $sp value
+						"lra", // load $ra value
+						declCode, // generate code for local declarations (they use the new $fp!!!)
+						visit(n.exp), // generate code for function body expression
+						"stm", // set $tm to popped value (function result)
+						popDecl, // remove local declarations from stack
+						"sra", // set $ra to popped value
+						"pop", // remove Access Link from stack
+						popParl, // remove parameters from stack
+						"sfp", // set $fp to popped value (Control Link)
+						"ltm", // load $tm value (function result)
+						"lra", // load $ra value
+						"js"  // jump to to popped address
+				)
+		);
+		return null;
+	}
+
+	@Override
+	public String visitNode(ClassCallNode n) throws VoidException {
+		printNode(n, n.classId + "." + n.methodId + " at nesting level: " + n.nestingLevel);
+		String argCode = null, getAR = null;
+		for (int i=n.args.size()-1;i>=0;i--) argCode=nlJoin(argCode,visit(n.args.get(i)));
+		for (int i = 0;i<n.nestingLevel-n.entry.nl;i++) getAR=nlJoin(getAR,"lw");
+		String controlLinkAndMethodValues = nlJoin(
+				"lfp", // load Control Link (pointer to frame of function "id" caller)
+				argCode, // generate code for argument expressions in reversed order
+				"lfp", getAR // retrieve address of frame containing "id" declaration
+		);
+		getAR = null;
+		for (int i = 0;i<n.nestingLevel-n.entry.nl;i++) getAR=nlJoin(getAR,"lw");
+		String loadObjectPointer = nlJoin(
+				"push "+n.entry.offset,
+				"add", // compute address of "id" declaration
+				"lw" // load value of "id" variable
+		);
+		return nlJoin(
+				controlLinkAndMethodValues,
+				loadObjectPointer,
+				"stm", //setto access link
+				"ltm", //poi lo carico
+				"ltm", //e lo copio
+				"push "+n.methodEntry.offset,
+				"add", //calcolo l'offset del metodo
+				"lw", //carico l'indirizzo
+				"js" //ci vado
+		);
+
+	}
+
+	@Override
+	public String visitNode(NewNode n) throws VoidException {
+		printNode(n, n.classId);
+		String loadArgsValuesOnStack = n.args.stream()
+				.map(this::visit)
+				.collect(Collectors.joining("\n"));
+		AtomicReference<String> loadValuesInHeap = new AtomicReference<>("");
+		n.args.forEach(a ->
+				loadValuesInHeap.set(nlJoin(
+						loadValuesInHeap.get(),
+						"lhp", //metto su stack hp
+						"sw", //salvo in memoria il valore dell'argomento
+						"lhp",
+						"push 1",
+						"add",
+						"shp" //aumento hp di uno
+				)));
+		String loadDispatchPointer = nlJoin(
+				"push " + (ExecuteVM.MEMSIZE + n.entry.offset),
+				"lw", //prendo l'indirizzo
+				"lhp", //heap pointer
+				"sw", //carico indirizzo sul heap
+				"lhp", //metto sullo stack hp
+				"lhp",
+				"push 1",
+				"add",
+				"shp" //aumento hp di uno
+		);
+		return nlJoin(
+				loadArgsValuesOnStack,
+				loadValuesInHeap.get(),
+				loadDispatchPointer
+		);
+	}
+
+	@Override
+	public String visitNode(EmptyNode n) throws VoidException {
+		if (print) printNode(n);
+		return "push -1";
 	}
 }
