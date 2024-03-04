@@ -294,6 +294,7 @@ public class SymbolTableASTVisitor extends BaseASTVisitor<Void,VoidException> {
 			}
 		}
 		//visito tutti i metodi all'interno della classe
+		decOffset=classType.methodTypes.size();
 		for (MethodNode method : n.methods) {
 			visit(method);
 			classType.methodTypes.add(method.offset, new MethodTypeNode(new ArrowTypeNode(
@@ -334,9 +335,10 @@ public class SymbolTableASTVisitor extends BaseASTVisitor<Void,VoidException> {
 			hm.put(n.id, new STentry(
 					nestingLevel,
 					new MethodTypeNode(new ArrowTypeNode(parTypes,n.retType)),
-					decOffset--)
+					decOffset++)
 			);
 		}
+		n.offset = hm.get(n.id).offset;
 		//creare una nuova hashmap per la symTable
 		nestingLevel++;
 		Map<String, STentry> hmn = new HashMap<>();

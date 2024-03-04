@@ -318,38 +318,27 @@ public class CodeGenerationASTVisitor extends BaseASTVisitor<String, VoidExcepti
 	public String visitNode(ClassNode n) {
 		if (print) printNode(n,n.id);
 		// aggiundo alla dispatch table la classe con relativi metodi
-		List<String> dispatchTable;
-		if (n.superId != null) {
-			dispatchTable = new ArrayList<>(dispatchTables.get(-n.superEntry.offset-2));
-		} else {
-			dispatchTable = new ArrayList<>();
+		List<String> dispatchTable = new ArrayList<>();
+		String loadMethodsInHeap = "";
+		for (MethodNode method : n.methods) {
+			visit(method);
+			dispatchTable.add(method.label);
+			// salvo l'id sull'heap e incremento il pointer, per ogni metodo
+			loadMethodsInHeap = nlJoin(
+					loadMethodsInHeap,
+					"push " + method.label,
+					"lhp",
+					"sw",
+					"lhp",
+					"push 1",
+					"add",
+					"shp"
+			);
 		}
-		n.methods.forEach(
-				methodNode -> {
-					visit(methodNode);
-					if (n.superId != null)
-						dispatchTable.set(methodNode.offset, methodNode.label);
-					else
-						dispatchTable.add(methodNode.label);
-				}
-		);
 		dispatchTables.add(dispatchTable);
-		AtomicReference<String> instructionList = new AtomicReference<>("");
-		// salvo l'id sull'heap e incremento il pointer, per ogni
-		dispatchTable.forEach(
-				method -> instructionList.set(nlJoin(
-								instructionList.get(),
-								"push " + method,
-								"lhp",
-								"sw",
-								"lhp",
-								"push 1",
-								"add",
-								"shp"
-				)));
 		return nlJoin(
 				"lhp",
-				instructionList.get()
+				loadMethodsInHeap
 		);
 	}
 
@@ -387,7 +376,7 @@ public class CodeGenerationASTVisitor extends BaseASTVisitor<String, VoidExcepti
 
 	@Override
 	public String visitNode(ClassCallNode n) throws VoidException {
-		printNode(n, n.classId + "." + n.methodId + " at nesting level: " + n.nestingLevel);
+		if (print) printNode(n, n.classId + "." + n.methodId + " at nesting level: " + n.nestingLevel);
 		String argCode = null, getAR = null;
 		for (int i=n.args.size()-1;i>=0;i--) argCode=nlJoin(argCode,visit(n.args.get(i)));
 		for (int i = 0;i<n.nestingLevel-n.entry.nl;i++) getAR=nlJoin(getAR,"lw");
@@ -396,8 +385,6 @@ public class CodeGenerationASTVisitor extends BaseASTVisitor<String, VoidExcepti
 				argCode, // generate code for argument expressions in reversed order
 				"lfp", getAR // retrieve address of frame containing "id" declaration
 		);
-		getAR = null;
-		for (int i = 0;i<n.nestingLevel-n.entry.nl;i++) getAR=nlJoin(getAR,"lw");
 		String loadObjectPointer = nlJoin(
 				"push "+n.entry.offset,
 				"add", // compute address of "id" declaration
@@ -409,6 +396,7 @@ public class CodeGenerationASTVisitor extends BaseASTVisitor<String, VoidExcepti
 				"stm", //setto access link
 				"ltm", //poi lo carico
 				"ltm", //e lo copio
+				"lw",
 				"push "+n.methodEntry.offset,
 				"add", //calcolo l'offset del metodo
 				"lw", //carico l'indirizzo
@@ -419,21 +407,20 @@ public class CodeGenerationASTVisitor extends BaseASTVisitor<String, VoidExcepti
 
 	@Override
 	public String visitNode(NewNode n) throws VoidException {
-		printNode(n, n.classId);
-		String loadArgsValuesOnStack = n.args.stream()
-				.map(this::visit)
-				.collect(Collectors.joining("\n"));
-		AtomicReference<String> loadValuesInHeap = new AtomicReference<>("");
-		n.args.forEach(a ->
-				loadValuesInHeap.set(nlJoin(
-						loadValuesInHeap.get(),
-						"lhp", //metto su stack hp
-						"sw", //salvo in memoria il valore dell'argomento
-						"lhp",
-						"push 1",
-						"add",
-						"shp" //aumento hp di uno
-				)));
+		if (print) printNode(n, n.classId);
+		String argCode = null;
+		for (int i=n.args.size()-1;i>=0;i--) argCode=nlJoin(argCode,visit(n.args.get(i)));
+		String loadValuesInHeap = "";
+		for (int i=n.args.size()-1;i>=0;i--)
+			loadValuesInHeap = nlJoin(
+					loadValuesInHeap,
+					"lhp", //metto su stack hp
+					"sw", //salvo in memoria il valore dell'argomento
+					"lhp",
+					"push 1",
+					"add",
+					"shp" //aumento hp di uno
+			);
 		String loadDispatchPointer = nlJoin(
 				"push " + (ExecuteVM.MEMSIZE + n.entry.offset),
 				"lw", //prendo l'indirizzo
@@ -446,8 +433,8 @@ public class CodeGenerationASTVisitor extends BaseASTVisitor<String, VoidExcepti
 				"shp" //aumento hp di uno
 		);
 		return nlJoin(
-				loadArgsValuesOnStack,
-				loadValuesInHeap.get(),
+				argCode,
+				loadValuesInHeap,
 				loadDispatchPointer
 		);
 	}
