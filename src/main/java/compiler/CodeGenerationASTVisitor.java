@@ -182,17 +182,25 @@ public class CodeGenerationASTVisitor extends BaseASTVisitor<String, VoidExcepti
 		);
 	}
 
-	// a>=b -> a==b || ! (a <= b)
 	@Override
 	public String visitNode(GreaterEqualNode n) {
 		if (print) printNode(n);
-		return visitNode(
-				new OrNode(
-						new EqualNode(n.left, n.right),
-						new NotNode(
-								new LessEqualNode(n.left, n.right)
-						)
-				)
+		String itsEqualOrGreater = freshLabel();
+		String itsLess = freshLabel();
+		String jumpOver = freshLabel();
+		return nlJoin(
+				visit(n.left),
+				visit(n.right),
+				"beq "+itsEqualOrGreater,
+				visit(n.left),
+				visit(n.right),
+				"bleq "+itsLess,
+				itsEqualOrGreater+":",
+				"push 1",
+				"b "+jumpOver,
+				itsLess+":",
+				"push 0",
+				jumpOver+":"
 		);
 	}
 

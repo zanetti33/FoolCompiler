@@ -1,18 +1,1 @@
-let
-
-  class Account (money:int) {
-    fun getMon:int () money;
-  }
-  
-  class TradingAcc extends Account (invested:int) {
-    fun getInv:int () invested;
-  }
-
-  class BankLoan (loan: Account) {
-    fun getLoan:Account () loan;
-  }
-
-  var bankLoan:BankLoan = new BankLoan(new TradingAcc(20000,5000));
-  var account:TradingAcc = bankLoan.getLoan();
-      
-in print(account.getInv());
+print(15 >= 5);
