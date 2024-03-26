@@ -1,1 +1,7 @@
-print(15 >= 5);
+let
+
+  class Account (money:int) {
+    fun getMon:int () money;
+  }
+
+in print(0);

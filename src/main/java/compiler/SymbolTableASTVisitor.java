@@ -295,12 +295,18 @@ public class SymbolTableASTVisitor extends BaseASTVisitor<Void,VoidException> {
 		}
 		//visito tutti i metodi all'interno della classe
 		decOffset=classType.methodTypes.size();
+		Set<String> methodLabes = new HashSet<>();
 		for (MethodNode method : n.methods) {
-			visit(method);
-			classType.methodTypes.add(method.offset, new MethodTypeNode(new ArrowTypeNode(
-					method.parlist.stream().map(DecNode::getType).toList(),
-					method.retType
-			)));
+			if (methodLabes.add(method.id)) {
+				visit(method);
+				classType.methodTypes.add(method.offset, new MethodTypeNode(new ArrowTypeNode(
+						method.parlist.stream().map(DecNode::getType).toList(),
+						method.retType
+				)));
+			} else {
+				System.out.println("Method id " + method.id + " at line " + method.getLine() + " already declared");
+				stErrors++;
+			}
 		}
 		//rimuovere la hashmap corrente poiche' esco dallo scope
 		symTable.remove(nestingLevel--);

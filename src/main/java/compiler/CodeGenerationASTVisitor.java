@@ -7,8 +7,6 @@ import svm.ExecuteVM;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
 
 import static compiler.lib.FOOLlib.*;
 
@@ -327,14 +325,23 @@ public class CodeGenerationASTVisitor extends BaseASTVisitor<String, VoidExcepti
 		if (print) printNode(n,n.id);
 		// aggiundo alla dispatch table la classe con relativi metodi
 		List<String> dispatchTable = new ArrayList<>();
-		String loadMethodsInHeap = "";
+		if (n.superId != null) {
+			dispatchTable.addAll(dispatchTables.get(-n.superEntry.offset - 2));
+		}
 		for (MethodNode method : n.methods) {
 			visit(method);
-			dispatchTable.add(method.label);
+			if (method.offset < dispatchTable.size()) {
+				dispatchTable.set(method.offset, method.label);
+			} else {
+				dispatchTable.add(method.label);
+			}
+		}
+		String loadMethodsInHeap = "";
+		for (String methodLabel : dispatchTable) {
 			// salvo l'id sull'heap e incremento il pointer, per ogni metodo
 			loadMethodsInHeap = nlJoin(
 					loadMethodsInHeap,
-					"push " + method.label,
+					"push " + methodLabel,
 					"lhp",
 					"sw",
 					"lhp",
@@ -353,13 +360,13 @@ public class CodeGenerationASTVisitor extends BaseASTVisitor<String, VoidExcepti
 	@Override
 	public String visitNode(MethodNode n) {
 		if (print) printNode(n,n.id);
-		String declCode = null, popDecl = null, popParl = null;
+		String declCode = null, popDecl = null, popParameters = null;
 		for (Node dec : n.declist) {
 			declCode = nlJoin(declCode,visit(dec));
 			popDecl = nlJoin(popDecl,"pop");
 		}
-		for (int i=0;i<n.parlist.size();i++) popParl = nlJoin(popParl,"pop");
-		String methodLabel = freshLabel();
+		for (Node ignored : n.parlist) popParameters = nlJoin(popParameters,"pop");
+		String methodLabel = freshFunLabel();
 		n.label = methodLabel;
 		putCode(
 				nlJoin(
@@ -372,7 +379,7 @@ public class CodeGenerationASTVisitor extends BaseASTVisitor<String, VoidExcepti
 						popDecl, // remove local declarations from stack
 						"sra", // set $ra to popped value
 						"pop", // remove Access Link from stack
-						popParl, // remove parameters from stack
+						popParameters, // remove parameters from stack
 						"sfp", // set $fp to popped value (Control Link)
 						"ltm", // load $tm value (function result)
 						"lra", // load $ra value

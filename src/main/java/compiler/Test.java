@@ -13,7 +13,7 @@ import visualsvm.*;
 public class Test {
     public static void main(String[] args) throws Exception {
    			
-    	String fileName = "pippo.fool";
+    	String fileName = "bankloan.fool";
 
     	CharStream chars = CharStreams.fromFileName(fileName);
     	FOOLLexer lexer = new FOOLLexer(chars);
