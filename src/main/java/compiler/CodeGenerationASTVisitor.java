@@ -409,9 +409,9 @@ public class CodeGenerationASTVisitor extends BaseASTVisitor<String, VoidExcepti
 	public String visitNode(NewNode n) throws VoidException {
 		if (print) printNode(n, n.classId);
 		String argCode = null;
-		for (int i=n.args.size()-1;i>=0;i--) argCode=nlJoin(argCode,visit(n.args.get(i)));
+		for (int i=0;i<n.args.size();i++) argCode=nlJoin(argCode,visit(n.args.get(i)));
 		String loadValuesInHeap = "";
-		for (int i=n.args.size()-1;i>=0;i--)
+		for (int i=0;i<n.args.size();i++)
 			loadValuesInHeap = nlJoin(
 					loadValuesInHeap,
 					"lhp", //metto su stack hp

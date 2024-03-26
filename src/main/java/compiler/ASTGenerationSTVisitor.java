@@ -248,13 +248,13 @@ public class ASTGenerationSTVisitor extends FOOLBaseVisitor<Node> {
 		String superId = ctx.EXTENDS() == null ? null : ids.remove(0).getText();
 		// e scorro sugli altri che sono invece i campi
 		List<FieldNode> fields = new ArrayList<>();
-		AtomicInteger iType = new AtomicInteger();
-		ids.forEach(fieldCtx -> {
-			TypeNode type = (TypeNode) visit(ctx.type(iType.getAndIncrement()));
+		int i = 0;
+		for(TerminalNode fieldCtx : ids) {
+			TypeNode type = (TypeNode) visit(ctx.type(i++));
 			FieldNode node = new FieldNode(fieldCtx.getText(), type);
 			node.setLine(fieldCtx.getSymbol().getLine());
 			fields.add(node);
-		});
+		}
 		// prendo i metodi
 		List<MethodNode> methods = new ArrayList<>();
 		ctx.methdec().forEach(methCtx -> methods.add((MethodNode) visit(methCtx)));
