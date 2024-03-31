@@ -77,8 +77,8 @@ public class TypeCheckEASTVisitor extends BaseEASTVisitor<TypeNode,TypeException
 			throw new TypeException("Non boolean condition in if",n.getLine());
 		TypeNode t = visit(n.th);
 		TypeNode e = visit(n.el);
-		if (isSubtype(t, e)) return e;
-		if (isSubtype(e, t)) return t;
+		TypeNode lca = lowestCommonAncestor(t, e);
+		if (lca != null) return lca;
 		throw new TypeException("Incompatible types in then-else branches",n.getLine());
 	}
 
@@ -263,23 +263,27 @@ public class TypeCheckEASTVisitor extends BaseEASTVisitor<TypeNode,TypeException
 			}
 
 		if (n.superId != null) {
-			ClassTypeNode superType = (ClassTypeNode) n.superEntry.type;
-			ClassTypeNode thisType = (ClassTypeNode) n.type;
+			ClassTypeNode parentCT = (ClassTypeNode) n.superEntry.type;
+			ClassTypeNode thisCT = (ClassTypeNode) n.type;
 			// controllo che field siano sottotipi della super classe
-			for(int i = 0; i < superType.fieldTypes.size(); i++) {
-				if (!isSubtype(
-						thisType.fieldTypes.get(i),
-						superType.fieldTypes.get(i)
+			for(FieldNode fieldNode : n.fields) {
+				int pos = -fieldNode.offset-1;
+				if (pos < parentCT.fieldTypes.size() &&
+					!isSubtype(
+						thisCT.fieldTypes.get(pos),
+						parentCT.fieldTypes.get(pos)
 				))
-					throw new TypeException("field " + i + "of class " + n.id + " is not subtype of same field in superClass" + n.superId, n.getLine());
+					throw new TypeException("field " + pos + "of class " + n.id + " is not subtype of same field in superClass" + n.superId, n.getLine());
 			}
 			// controllo che methods siano sottotipi della super classe
-			for(int i = 0; i < superType.methodTypes.size(); i++) {
-				if (!isSubtype(
-						thisType.methodTypes.get(i),
-						superType.methodTypes.get(i)
+			for(MethodNode methodNode : n.methods) {
+				int pos = methodNode.offset;
+				if (pos < parentCT.methodTypes.size()
+					&& !isSubtype(
+						thisCT.methodTypes.get(pos),
+						parentCT.methodTypes.get(pos)
 				))
-					throw new TypeException("Method " + i + "of class " + n.id + " is not subtype of same method in superClass" + n.superId, n.getLine());
+					throw new TypeException("Method " + pos + "of class " + n.id + " is not subtype of same method in superClass" + n.superId, n.getLine());
 			}
 		}
 		return null;
